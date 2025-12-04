@@ -25,6 +25,33 @@ class IttenColorCircle:
             'split_complementary': 'Расщепленная комплементарная',
             'rectangle': 'Прямоугольная (тетрада)'
         }
+        
+        # Цветовые названия для круга (сокращенные)
+        self.color_names = {
+            "red": "Красный",
+            "orange": "Оранж",
+            "yellow": "Желтый",
+            "yellow_green": "Желт-зел",
+            "green": "Зеленый",
+            "emerald": "Изумруд",
+            "cyan": "Голубой",
+            "azure": "Лазурный",
+            "blue": "Синий",
+            "violet": "Фиолет",
+            "magenta": "Пурпур",
+            "crimson": "Малинов",
+            "red_orange": "Кр-оранж",
+            "orange_yellow": "Ор-желт",
+            "yellow_green2": "Желт-зел2",
+            "green_emerald": "Зел-изум",
+            "emerald_cyan": "Из-голуб",
+            "cyan_azure": "Гол-лазур",
+            "azure_blue": "Лаз-син",
+            "blue_violet": "Син-фиол",
+            "violet_magenta": "Фил-пурп",
+            "magenta_crimson": "Пурп-мал",
+            "crimson_red": "Мал-крас"
+        }
     
     def get_color_info(self, color_name):
         """Получить информацию о цвете"""
@@ -120,10 +147,10 @@ class IttenColorCircle:
         return self.main_colors[index]
     
     def create_color_palette_image(self, colors, scheme_name):
-        """Создать изображение палитры"""
+        """Создать изображение палитры (только цвета, без текста)"""
         try:
             width = 500
-            height = 250
+            height = 200
             color_width = width // len(colors)
             
             img = Image.new('RGB', (width, height), 'white')
@@ -133,32 +160,10 @@ class IttenColorCircle:
             for i, color_info in enumerate(colors):
                 x0 = i * color_width
                 x1 = (i + 1) * color_width
-                draw.rectangle([x0, 0, x1, height - 60], fill=color_info['rgb'])
-                
-                color_name = color_info['name'].replace('_', ' ').title()
-                hex_code = color_info['hex'].upper()
-                rgb = color_info['rgb']
-                
-                # Центрируем текст
-                text_x = x0 + color_width // 2
-                
-                # Определяем цвет текста на основе яркости фона
-                brightness = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000
-                text_color = 'black' if brightness > 128 else 'white'
-                
-                # Название цвета
-                draw.text((text_x - 40, height - 55), color_name[:10], fill=text_color)
-                # HEX код
-                draw.text((text_x - 25, height - 40), hex_code, fill=text_color)
-                # RGB значения
-                rgb_text = f"RGB: {rgb[0]}, {rgb[1]}, {rgb[2]}"
-                draw.text((text_x - 35, height - 25), rgb_text, fill=text_color)
+                draw.rectangle([x0, 0, x1, height], fill=color_info['rgb'])
             
-            # Добавляем название схемы
-            draw.text((10, 10), scheme_name, fill='black')
-            
-            # Рамка
-            draw.rectangle([0, 0, width-1, height-1], outline='gray', width=2)
+            # Добавляем рамку
+            draw.rectangle([0, 0, width-1, height-1], outline='black', width=3)
             
             # Сохраняем в байты
             img_byte_arr = io.BytesIO()
@@ -171,40 +176,23 @@ class IttenColorCircle:
             return None
     
     def create_color_preview(self, color_name):
-        """Создать превью одного цвета с информацией"""
+        """Создать превью одного цвета (только цвет, без текста)"""
         try:
             color_info = self.get_color_info(color_name)
             if not color_info:
                 return None
             
             width = 400
-            height = 300
+            height = 200
             
             img = Image.new('RGB', (width, height), 'white')
             draw = ImageDraw.Draw(img)
             
             # Основной цвет
-            draw.rectangle([50, 50, width-50, 150], fill=color_info['rgb'])
-            
-            # Текстовая информация
-            color_display = color_name.replace('_', ' ').title()
-            hex_code = color_info['hex'].upper()
-            rgb = color_info['rgb']
-            
-            # Название цвета
-            draw.text((width//2 - 100, 160), f"Цвет: {color_display}", fill='black')
-            
-            # HEX и RGB
-            draw.text((width//2 - 60, 190), f"HEX: {hex_code}", fill='black')
-            draw.text((width//2 - 70, 210), f"RGB: {rgb[0]}, {rgb[1]}, {rgb[2]}", fill='black')
-            
-            # Конвертация в HSV
-            h, s, v = colorsys.rgb_to_hsv(rgb[0]/255, rgb[1]/255, rgb[2]/255)
-            hsv_text = f"HSV: {int(h*360)}°, {int(s*100)}%, {int(v*100)}%"
-            draw.text((width//2 - 70, 230), hsv_text, fill='black')
+            draw.rectangle([0, 0, width, height], fill=color_info['rgb'])
             
             # Рамка
-            draw.rectangle([0, 0, width-1, height-1], outline='gray', width=2)
+            draw.rectangle([0, 0, width-1, height-1], outline='black', width=3)
             
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG')
@@ -216,11 +204,11 @@ class IttenColorCircle:
             return None
     
     def create_itten_circle_image(self):
-        """Создать изображение цветового круга Иттена"""
+        """Создать изображение цветового круга Иттена (упрощенный вариант)"""
         try:
-            size = 500
+            size = 600
             center = size // 2
-            radius = 200
+            radius = 250
             
             img = Image.new('RGB', (size, size), 'white')
             draw = ImageDraw.Draw(img)
@@ -240,23 +228,33 @@ class IttenColorCircle:
                     start_angle, end_angle,
                     fill=rgb, outline='black'
                 )
-                
-                # Название цвета
-                angle_rad = math.radians(i * 30)
-                text_x = center + int((radius + 30) * math.cos(angle_rad))
-                text_y = center + int((radius + 30) * math.sin(angle_rad))
-                
-                color_display = color_name.replace('_', '\n').title()
-                draw.text((text_x - 15, text_y - 10), color_display, fill='black')
             
-            # Центральная точка
-            draw.ellipse([center-5, center-5, center+5, center+5], fill='gray')
+            # Внутренний белый круг
+            inner_radius = radius // 3
+            draw.ellipse(
+                [center - inner_radius, center - inner_radius, 
+                 center + inner_radius, center + inner_radius],
+                fill='white', outline='black'
+            )
             
-            # Заголовок
-            draw.text((center - 100, 20), "Цветовой круг Иттена", fill='black')
+            # Текст в центре
+            try:
+                # Пытаемся использовать шрифт по умолчанию
+                from PIL import ImageFont
+                font = ImageFont.load_default()
+                text = "ITTEN"
+                bbox = draw.textbbox((0, 0), text, font=font)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+                draw.text(
+                    (center - text_width//2, center - text_height//2),
+                    text, fill='black', font=font
+                )
+            except:
+                pass  # Пропускаем текст если шрифт не доступен
             
             # Рамка
-            draw.rectangle([0, 0, size-1, size-1], outline='black', width=2)
+            draw.rectangle([0, 0, size-1, size-1], outline='black', width=3)
             
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG')
@@ -268,7 +266,7 @@ class IttenColorCircle:
             return None
     
     def create_extended_palette_image(self):
-        """Создать изображение полной палитры"""
+        """Создать изображение полной палитры (упрощенный вариант)"""
         try:
             width = 600
             height = 400
@@ -276,49 +274,31 @@ class IttenColorCircle:
             img = Image.new('RGB', (width, height), 'white')
             draw = ImageDraw.Draw(img)
             
-            # Заголовок
-            draw.text((width//2 - 100, 10), "Полная палитра цветов", fill='black')
-            
-            # Отображаем все цвета
+            # Отображаем все цвета в виде сетки
             colors_list = list(self.colors.items())
             cols = 6
             rows = (len(colors_list) + cols - 1) // cols
             
-            color_width = 90
-            color_height = 60
-            margin = 10
+            color_width = width // cols
+            color_height = height // rows
             
             for idx, (color_name, color_hex) in enumerate(colors_list):
                 row = idx // cols
                 col = idx % cols
                 
-                x0 = margin + col * (color_width + margin)
-                y0 = 50 + row * (color_height + margin)
+                x0 = col * color_width
+                y0 = row * color_height
                 x1 = x0 + color_width
                 y1 = y0 + color_height
                 
                 rgb = self.hex_to_rgb(color_hex)
                 draw.rectangle([x0, y0, x1, y1], fill=rgb)
                 
-                # Определяем цвет текста на основе яркости
-                brightness = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000
-                text_color = 'black' if brightness > 128 else 'white'
-                
-                # Название цвета
-                color_display = color_name.replace('_', ' ').title()
-                if len(color_display) > 10:
-                    color_display = color_display[:8] + ".."
-                draw.text((x0 + 5, y0 + 5), color_display, fill=text_color)
-                
-                # HEX код
-                draw.text((x0 + 5, y0 + 20), color_hex.upper(), fill=text_color)
-                
-                # RGB значения
-                rgb_text = f"{rgb[0]},{rgb[1]},{rgb[2]}"
-                draw.text((x0 + 5, y0 + 35), rgb_text, fill=text_color)
+                # Тонкая рамка для каждого цвета
+                draw.rectangle([x0, y0, x1, y1], outline='black', width=1)
             
-            # Рамка
-            draw.rectangle([0, 0, width-1, height-1], outline='gray', width=2)
+            # Внешняя рамка
+            draw.rectangle([0, 0, width-1, height-1], outline='black', width=3)
             
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG')
@@ -327,48 +307,6 @@ class IttenColorCircle:
             return img_byte_arr
         except Exception as e:
             print(f"Ошибка создания полной палитры: {e}")
-            return None
-    
-    def create_simple_color_list(self):
-        """Простой текстовый список цветов"""
-        try:
-            width = 400
-            height = 500
-            
-            img = Image.new('RGB', (width, height), 'white')
-            draw = ImageDraw.Draw(img)
-            
-            draw.text((10, 10), "Все доступные цвета:", fill='black')
-            
-            colors_list = list(self.colors.items())
-            y = 40
-            for i, (color_name, color_hex) in enumerate(colors_list):
-                rgb = self.hex_to_rgb(color_hex)
-                
-                # Образец цвета
-                draw.rectangle([10, y, 30, y+20], fill=rgb)
-                
-                # Название и HEX
-                color_display = color_name.replace('_', ' ').title()
-                text = f"{color_display}: {color_hex.upper()}"
-                draw.text((35, y), text, fill='black')
-                
-                y += 25
-                
-                # Если не помещается, создаем новое изображение
-                if y > height - 30 and i < len(colors_list) - 1:
-                    img_byte_arr = io.BytesIO()
-                    img.save(img_byte_arr, format='PNG')
-                    img_byte_arr.seek(0)
-                    return img_byte_arr
-            
-            img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format='PNG')
-            img_byte_arr.seek(0)
-            
-            return img_byte_arr
-        except Exception as e:
-            print(f"Ошибка создания списка цветов: {e}")
             return None
     
     def get_all_colors_list(self):
