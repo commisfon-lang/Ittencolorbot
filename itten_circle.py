@@ -1,164 +1,516 @@
-import json
-import colorsys
-from PIL import Image, ImageDraw
-import io
+import os
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler, 
+    CallbackQueryHandler, ContextTypes, filters
+)
+from itten_circle import IttenColorCircle
+from dotenv import load_dotenv
 
-class IttenColorCircle:
-    def __init__(self):
-        with open('colors.json', 'r', encoding='utf-8') as f:
-            self.colors = json.load(f)
-        
-        # Основные 12 цветов круга Иттена
-        self.main_colors = [
-            "red", "orange", "yellow", "yellow_green", 
-            "green", "emerald", "cyan", "azure",
-            "blue", "violet", "magenta", "crimson"
-        ]
-        
-        # Цветовые схемы
-        self.schemes = {
-            'complementary': 'Комплементарная (противоположные цвета)',
-            'triad': 'Триада (3 равноудаленных цвета)',
-            'analogous': 'Аналоговая (соседние цвета)',
-            'square': 'Квадрат (4 цвета через 90°)',
-            'split_complementary': 'Расщепленная комплементарная',
-            'rectangle': 'Прямоугольная (тетрада)'
-        }
+# Загрузка переменных окружения
+load_dotenv()
+
+# Настройка логирования
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# Инициализация цветового круга
+color_circle = IttenColorCircle()
+
+# Команды бота
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /start"""
+    welcome_text = """
+🎨 *Бот для подбора цветов по кругу Иттена*
+
+*Основные команды:*
+/start - Начало работы
+/help - Справка по командам
+/scheme - Подобрать цветовую схему
+/colors - Список доступных цветов с визуализацией
+/info - Информация о круге Иттена
+/circle - Показать цветовой круг Иттена
+/palette - Показать полную палитру цветов
+/color [название] - Информация о конкретном цвете
+
+*Примеры цветов:* red, blue, green, yellow, violet, orange
+
+*Новые возможности:*
+• Визуализация цветов
+• Цветовой круг
+• Полная палитра
+• Подробная информация о каждом цвете
+    """
     
-    def get_color_info(self, color_name):
-        """Получить информацию о цвете"""
-        color_name = color_name.lower()
-        if color_name in self.colors:
-            return {
-                'name': color_name,
-                'hex': self.colors[color_name],
-                'rgb': self.hex_to_rgb(self.colors[color_name])
-            }
-        return None
+    await update.message.reply_text(welcome_text, parse_mode='Markdown')
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /help"""
+    help_text = """
+*Доступные команды:*
+
+/scheme - Подобрать цветовую схему
+Выберите базовый цвет и тип схемы, чтобы получить гармоничную палитру
+
+/colors - Показать все доступные цвета с картинкой
+Полный список цветов из расширенного круга Иттена с визуализацией
+
+/circle - Показать цветовой круг Иттена
+Визуальное представление 12-секторного круга
+
+/palette - Показать полную палитру
+Все цвета с кодами HEX и RGB
+
+/color [название] - Информация о цвете
+Подробная информация о конкретном цвете
+
+/info - Информация о цветовом круге Иттена
+Теория и принципы использования
+
+*Типы схем:*
+• Комплементарная - противоположные цвета
+• Триада - 3 равноудаленных цвета
+• Аналоговая - соседние цвета
+• Квадрат - 4 цвета через 90°
+• Расщепленная комплементарная
+• Прямоугольная
+    """
     
-    def hex_to_rgb(self, hex_color):
-        """Конвертация HEX в RGB"""
-        hex_color = hex_color.lstrip('#')
-        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    await update.message.reply_text(help_text, parse_mode='Markdown')
+
+async def show_colors(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать все доступные цвета с визуализацией"""
+    colors = color_circle.get_all_colors_list()
     
-    def rgb_to_hex(self, rgb):
-        """Конвертация RGB в HEX"""
-        return '#{:02x}{:02x}{:02x}'.format(*rgb)
+    # Разделяем цвета на группы по 6 для лучшего отображения
+    color_groups = [colors[i:i+6] for i in range(0, len(colors), 6)]
     
-    def find_position(self, color_name):
-        """Найти позицию цвета в круге"""
-        if color_name in self.main_colors:
-            return self.main_colors.index(color_name) * 30
-        return None
+    response = "*Доступные цвета:*\n\n"
+    for group in color_groups:
+        for color in group:
+            color_display = color.replace('_', ' ').title()
+            hex_code = color_circle.colors.get(color, '#000000').upper()
+            response += f"• {color_display} - `{hex_code}`\n"
+        response += "\n"
     
-    def get_scheme(self, base_color, scheme_type):
-        """Получить цветовую схему"""
-        base_info = self.get_color_info(base_color)
-        if not base_info:
-            return None
-        
-        position = self.find_position(base_color)
-        if position is None:
-            position = 0
-        
-        schemes = []
-        
-        if scheme_type == 'complementary':
-            # Противоположный цвет (180°)
-            opposite_pos = (position + 180) % 360
-            schemes = [base_color, self.get_color_at_angle(opposite_pos)]
-            
-        elif scheme_type == 'triad':
-            # Триада (3 цвета через 120°)
-            schemes = [
-                base_color,
-                self.get_color_at_angle((position + 120) % 360),
-                self.get_color_at_angle((position + 240) % 360)
-            ]
-            
-        elif scheme_type == 'analogous':
-            # Аналоговая схема (соседние цвета ±30°)
-            schemes = [
-                self.get_color_at_angle((position - 30) % 360),
-                base_color,
-                self.get_color_at_angle((position + 30) % 360)
-            ]
-            
-        elif scheme_type == 'square':
-            # Квадрат (4 цвета через 90°)
-            schemes = [
-                base_color,
-                self.get_color_at_angle((position + 90) % 360),
-                self.get_color_at_angle((position + 180) % 360),
-                self.get_color_at_angle((position + 270) % 360)
-            ]
-            
-        elif scheme_type == 'split_complementary':
-            # Расщепленная комплементарная
-            schemes = [
-                base_color,
-                self.get_color_at_angle((position + 150) % 360),
-                self.get_color_at_angle((position + 210) % 360)
-            ]
-            
-        elif scheme_type == 'rectangle':
-            # Прямоугольная схема (4 цвета)
-            schemes = [
-                base_color,
-                self.get_color_at_angle((position + 60) % 360),
-                self.get_color_at_angle((position + 180) % 360),
-                self.get_color_at_angle((position + 240) % 360)
-            ]
-        
-        # Получаем информацию о цветах схемы
-        result = []
-        for color in schemes:
-            if isinstance(color, str):
-                info = self.get_color_info(color)
-                if info:
-                    result.append(info)
-        
-        return result
+    response += "\nИспользуйте команду /color [название] для получения подробной информации."
     
-    def get_color_at_angle(self, angle):
-        """Получить цвет по углу в круге"""
-        index = round(angle / 30) % 12
-        return self.main_colors[index]
+    # Создаем и отправляем изображение палитры
+    try:
+        palette_img = color_circle.create_extended_palette_image()
+        await update.message.reply_photo(
+            photo=palette_img,
+            caption=response,
+            parse_mode='Markdown'
+        )
+    except Exception as e:
+        logger.error(f"Error creating palette: {e}")
+        await update.message.reply_text(response, parse_mode='Markdown')
+
+async def show_itten_circle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать цветовой круг Иттена"""
+    try:
+        circle_img = color_circle.create_itten_circle_image()
+        caption = """
+*Цветовой круг Иттена*
+
+12-секторный круг показывает основные цветовые отношения:
+• 3 первичных цвета (красный, желтый, синий)
+• 3 вторичных (оранжевый, зеленый, фиолетовый)
+• 6 третичных цветов
+
+Используйте круг для понимания цветовых гармоний!
+        """
+        await update.message.reply_photo(
+            photo=circle_img,
+            caption=caption,
+            parse_mode='Markdown'
+        )
+    except Exception as e:
+        logger.error(f"Error creating circle: {e}")
+        await update.message.reply_text("Не удалось создать изображение круга.")
+
+async def show_full_palette(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать полную палитру"""
+    try:
+        palette_img = color_circle.create_extended_palette_image()
+        caption = """
+*Полная палитра цветов*
+
+Все цвета расширенного круга Иттена с их:
+• Названиями
+• HEX-кодами
+• RGB значениями
+
+Используйте эти цвета для создания гармоничных схем!
+        """
+        await update.message.reply_photo(
+            photo=palette_img,
+            caption=caption,
+            parse_mode='Markdown'
+        )
+    except Exception as e:
+        logger.error(f"Error creating palette: {e}")
+        await update.message.reply_text("Не удалось создать изображение палитры.")
+
+async def show_color_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать информацию о конкретном цвете"""
+    if not context.args:
+        await update.message.reply_text(
+            "Пожалуйста, укажите название цвета.\n"
+            "Например: /color red\n"
+            "Или используйте /colors чтобы увидеть все доступные цвета."
+        )
+        return
     
-    def create_color_palette_image(self, colors, scheme_name):
-        """Создать изображение палитры"""
-        width = 400
-        height = 200
-        color_width = width // len(colors)
-        
-        img = Image.new('RGB', (width, height), 'white')
-        draw = ImageDraw.Draw(img)
-        
-        # Рисуем цветные прямоугольники
-        for i, color_info in enumerate(colors):
-            x0 = i * color_width
-            x1 = (i + 1) * color_width
-            draw.rectangle([x0, 0, x1, height - 40], fill=color_info['rgb'])
-            
-            # Добавляем название цвета и HEX
-            color_name = color_info['name'].replace('_', ' ').title()
-            hex_code = color_info['hex'].upper()
-            
-            # Центрируем текст
-            text_x = x0 + color_width // 2
-            draw.text((text_x - 30, height - 35), color_name[:10], fill='black')
-            draw.text((text_x - 30, height - 20), hex_code, fill='black')
-        
-        # Добавляем название схемы
-        draw.text((10, 10), scheme_name, fill='black', stroke_width=1, stroke_fill='white')
-        
-        # Сохраняем в байты
-        img_byte_arr = io.BytesIO()
-        img.save(img_byte_arr, format='PNG')
-        img_byte_arr.seek(0)
-        
-        return img_byte_arr
+    color_name = ' '.join(context.args).lower().replace(' ', '_')
+    color_info = color_circle.get_color_info(color_name)
     
-    def get_all_colors_list(self):
-        """Получить список всех доступных цветов"""
-        return list(self.colors.keys())
+    if not color_info:
+        await update.message.reply_text(
+            f"Цвет '{color_name}' не найден.\n"
+            "Используйте /colors чтобы увидеть все доступные цвета."
+        )
+        return
+    
+    # Создаем и отправляем изображение с информацией о цвете
+    try:
+        color_img = color_circle.create_color_preview(color_name)
+        
+        color_display = color_name.replace('_', ' ').title()
+        hex_code = color_info['hex'].upper()
+        rgb = color_info['rgb']
+        
+        # Конвертация в HSV
+        import colorsys
+        h, s, v = colorsys.rgb_to_hsv(rgb[0]/255, rgb[1]/255, rgb[2]/255)
+        
+        caption = f"""
+*{color_display}*
+
+*Код цвета:*
+HEX: `{hex_code}`
+RGB: `{rgb[0]}, {rgb[1]}, {rgb[2]}`
+HSV: `{int(h*360)}°, {int(s*100)}%, {int(v*100)}%`
+
+*Использование:*
+Этот цвет находится в позиции {color_circle.find_position(color_name) or 'N/A'}° в круге Иттена.
+        """
+        
+        await update.message.reply_photo(
+            photo=color_img,
+            caption=caption,
+            parse_mode='Markdown'
+        )
+        
+        # Показываем примеры использования цвета
+        keyboard = [[
+            InlineKeyboardButton("🎨 Схемы с этим цветом", callback_data=f"scheme_color_{color_name}")
+        ]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            "Хотите создать цветовые схемы с этим цветом?",
+            reply_markup=reply_markup
+        )
+        
+    except Exception as e:
+        logger.error(f"Error creating color preview: {e}")
+        
+        color_display = color_name.replace('_', ' ').title()
+        hex_code = color_info['hex'].upper()
+        rgb = color_info['rgb']
+        
+        await update.message.reply_text(
+            f"*{color_display}*\n\n"
+            f"HEX: `{hex_code}`\n"
+            f"RGB: `{rgb[0]}, {rgb[1]}, {rgb[2]}`\n\n"
+            "Для создания схем используйте /scheme",
+            parse_mode='Markdown'
+        )
+
+async def show_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Информация о круге Иттена"""
+    info_text = """
+*Цветовой круг Иттена*
+
+Иоганнес Иттен (1888-1967) - швейцарский художник и теоретик цвета, разработавший 12-частный цветовой круг, который стал основой для изучения цвета.
+
+*Структура круга:*
+1. Первичные цвета (3): красный, желтый, синий
+2. Вторичные цвета (3): оранжевый, зеленый, фиолетовый
+3. Третичные цвета (6): красно-оранжевый, желто-оранжевый, желто-зеленый, сине-зеленый, сине-фиолетовый, красно-фиолетовый
+
+*Принципы гармонии:*
+• Контраст дополнительных цветов
+• Контраст холодного и теплого
+• Симультанный контраст
+• Контраст насыщения
+• Контраст светлого и темного
+
+*Новые команды для визуализации:*
+/circle - Показать цветовой круг
+/palette - Показать полную палитру
+/color [название] - Детальная информация о цвете
+
+Используйте /scheme чтобы создать гармоничные цветовые сочетания!
+    """
+    
+    await update.message.reply_text(info_text, parse_mode='Markdown')
+
+async def choose_color(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Выбор базового цвета"""
+    # Создаем клавиатуру с цветами (группируем по 3 в ряд)
+    colors = color_circle.get_all_colors_list()
+    keyboard = []
+    row = []
+    
+    for i, color in enumerate(colors):
+        color_display = color.replace('_', ' ').title()
+        # Сокращаем длинные названия
+        if len(color_display) > 10:
+            color_display = color_display[:8] + ".."
+        row.append(InlineKeyboardButton(color_display, callback_data=f"color_{color}"))
+        
+        if len(row) == 4 or i == len(colors) - 1:
+            keyboard.append(row)
+            row = []
+    
+    # Добавляем кнопку для просмотра круга
+    keyboard.append([
+        InlineKeyboardButton("🔵 Показать цветовой круг", callback_data="show_circle")
+    ])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "🎨 Выберите базовый цвет:",
+        reply_markup=reply_markup
+    )
+
+async def choose_scheme(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Выбор типа схемы после выбора цвета"""
+    query = update.callback_query
+    await query.answer()
+    
+    # Извлекаем выбранный цвет
+    color_name = query.data.split('_')[1]
+    context.user_data['base_color'] = color_name
+    
+    # Создаем клавиатуру с типами схем
+    keyboard = []
+    for scheme_type, scheme_name in color_circle.schemes.items():
+        keyboard.append([
+            InlineKeyboardButton(scheme_name, callback_data=f"scheme_{scheme_type}")
+        ])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    color_display = color_name.replace('_', ' ').title()
+    await query.edit_message_text(
+        f"Выбран цвет: *{color_display}*\n\n"
+        "Теперь выберите тип цветовой схемы:",
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+async def show_scheme(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать выбранную цветовую схему"""
+    query = update.callback_query
+    await query.answer()
+    
+    scheme_type = query.data.split('_')[1]
+    base_color = context.user_data.get('base_color', 'red')
+    
+    # Получаем схему
+    scheme_colors = color_circle.get_scheme(base_color, scheme_type)
+    
+    if not scheme_colors:
+        await query.edit_message_text("Ошибка при создании схемы. Попробуйте еще раз.")
+        return
+    
+    # Создаем текст с информацией
+    base_color_display = base_color.replace('_', ' ').title()
+    scheme_name = color_circle.schemes.get(scheme_type, scheme_type)
+    
+    text = f"*Цветовая схема:* {scheme_name}\n"
+    text += f"*Базовый цвет:* {base_color_display}\n\n"
+    text += "*Цвета в схеме:*\n"
+    
+    for i, color_info in enumerate(scheme_colors, 1):
+        color_name = color_info['name'].replace('_', ' ').title()
+        text += f"{i}. *{color_name}*: `{color_info['hex'].upper()}`\n"
+    
+    # Создаем изображение палитры
+    try:
+        img_bytes = color_circle.create_color_palette_image(scheme_colors, scheme_name)
+        
+        # Отправляем изображение и текст
+        await context.bot.send_photo(
+            chat_id=query.message.chat_id,
+            photo=img_bytes,
+            caption=text,
+            parse_mode='Markdown'
+        )
+        
+        # Оставляем сообщение с кнопкой для нового выбора
+        keyboard = [[
+            InlineKeyboardButton("🎨 Новый цвет", callback_data="new_color"),
+            InlineKeyboardButton("📋 Новую схему", callback_data=f"new_scheme_{base_color}")
+        ], [
+            InlineKeyboardButton("🔄 С другим базовым", callback_data=f"scheme_color_{base_color}")
+        ]]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            "Готово! Хотите создать еще одну схему?",
+            reply_markup=reply_markup
+        )
+        
+    except Exception as e:
+        logger.error(f"Error creating image: {e}")
+        await query.edit_message_text(f"Текстовая информация:\n\n{text}", parse_mode='Markdown')
+
+async def handle_special_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка специальных callback-команд"""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "show_circle":
+        # Показываем цветовой круг
+        try:
+            circle_img = color_circle.create_itten_circle_image()
+            await context.bot.send_photo(
+                chat_id=query.message.chat_id,
+                photo=circle_img,
+                caption="Цветовой круг Иттена"
+            )
+        except Exception as e:
+            logger.error(f"Error creating circle: {e}")
+            await query.edit_message_text("Не удалось создать изображение круга.")
+    
+    elif query.data.startswith("scheme_color_"):
+        # Создание схемы с определенным цветом
+        color_name = query.data.split('_')[2]
+        context.user_data['base_color'] = color_name
+        
+        # Создаем клавиатуру с типами схем
+        keyboard = []
+        for scheme_type, scheme_name in color_circle.schemes.items():
+            keyboard.append([
+                InlineKeyboardButton(scheme_name, callback_data=f"scheme_{scheme_type}")
+            ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        color_display = color_name.replace('_', ' ').title()
+        await query.edit_message_text(
+            f"Создание схемы с цветом: *{color_display}*\n\n"
+            "Выберите тип цветовой схемы:",
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+
+async def handle_new_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка кнопок нового выбора"""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "new_color":
+        await choose_color(update, context)
+    elif query.data.startswith("new_scheme"):
+        base_color = query.data.split('_')[2]
+        context.user_data['base_color'] = base_color
+        await choose_scheme(update, context)
+
+async def handle_color_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка текстового ввода цвета"""
+    user_input = update.message.text.strip().lower().replace(' ', '_')
+    
+    # Проверяем, есть ли такой цвет
+    color_info = color_circle.get_color_info(user_input)
+    
+    if color_info:
+        context.user_data['base_color'] = user_input
+        
+        # Создаем клавиатуру с типами схем
+        keyboard = []
+        for scheme_type, scheme_name in color_circle.schemes.items():
+            keyboard.append([
+                InlineKeyboardButton(scheme_name, callback_data=f"scheme_{scheme_type}")
+            ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        color_display = user_input.replace('_', ' ').title()
+        await update.message.reply_text(
+            f"Выбран цвет: *{color_display}*\n\n"
+            "Теперь выберите тип цветовой схемы:",
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+    else:
+        await update.message.reply_text(
+            "Цвет не найден. Используйте команду /colors чтобы увидеть все доступные цвета, "
+            "или /scheme чтобы выбрать цвет из списка."
+        )
+
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ошибок"""
+    logger.error(f"Update {update} caused error {context.error}")
+    
+    if update and update.effective_message:
+        await update.effective_message.reply_text(
+            "Произошла ошибка. Пожалуйста, попробуйте еще раз или используйте /start"
+        )
+
+def main():
+    """Запуск бота"""
+    # Получаем токен бота
+    TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+    if not TOKEN:
+        logger.error("Не найден TELEGRAM_BOT_TOKEN в переменных окружения!")
+        return
+    
+    # Создаем приложение
+    application = Application.builder().token(TOKEN).build()
+    
+    # Регистрируем обработчики команд
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("colors", show_colors))
+    application.add_handler(CommandHandler("circle", show_itten_circle))
+    application.add_handler(CommandHandler("palette", show_full_palette))
+    application.add_handler(CommandHandler("color", show_color_info))
+    application.add_handler(CommandHandler("info", show_info))
+    application.add_handler(CommandHandler("scheme", choose_color))
+    
+    # Регистрируем обработчики callback-запросов
+    application.add_handler(CallbackQueryHandler(choose_scheme, pattern="^color_"))
+    application.add_handler(CallbackQueryHandler(show_scheme, pattern="^scheme_"))
+    application.add_handler(CallbackQueryHandler(handle_special_commands, pattern="^(show_circle|scheme_color_)"))
+    application.add_handler(CallbackQueryHandler(handle_new_choice, pattern="^new_"))
+    
+    # Регистрируем обработчик текстовых сообщений
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_color_input))
+    
+    # Регистрируем обработчик ошибок
+    application.add_error_handler(error_handler)
+    
+    # Запускаем бота
+    print("🎨 Бот запущен...")
+    print("Доступные команды:")
+    print("/start - Начало работы")
+    print("/scheme - Создание цветовой схемы")
+    print("/circle - Цветовой круг Иттена")
+    print("/palette - Полная палитра")
+    print("/color [название] - Информация о цвете")
+    
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+if __name__ == '__main__':
+    main()
