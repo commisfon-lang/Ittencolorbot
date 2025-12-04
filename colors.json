@@ -1,0 +1,26 @@
+{
+    "red": "#FF0000",
+    "orange": "#FF8000",
+    "yellow": "#FFFF00",
+    "yellow_green": "#80FF00",
+    "green": "#00FF00",
+    "emerald": "#00FF80",
+    "cyan": "#00FFFF",
+    "azure": "#0080FF",
+    "blue": "#0000FF",
+    "violet": "#8000FF",
+    "magenta": "#FF00FF",
+    "crimson": "#FF0080",
+    
+    "red_orange": "#FF4000",
+    "orange_yellow": "#FFC000",
+    "yellow_green2": "#C0FF00",
+    "green_emerald": "#00FF40",
+    "emerald_cyan": "#00FFC0",
+    "cyan_azure": "#00C0FF",
+    "azure_blue": "#0040FF",
+    "blue_violet": "#4000FF",
+    "violet_magenta": "#C000FF",
+    "magenta_crimson": "#FF00C0",
+    "crimson_red": "#FF0040"
+}
