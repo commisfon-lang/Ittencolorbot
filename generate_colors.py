@@ -1,6 +1,5 @@
 import json
 import colorsys
-import math
 
 def generate_60_colors():
     """Генерация 60 цветов: 12 основных цветов по 5 оттенков каждый"""
