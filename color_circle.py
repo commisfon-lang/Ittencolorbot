@@ -9,12 +9,15 @@ class IttenColorCircle:
         with open('colors.json', 'r', encoding='utf-8') as f:
             self.colors = json.load(f)
         
-        # Основные 12 цветов круга Иттена
+        # Основные 12 цветов круга Иттена (средние тона)
         self.main_colors = [
-            "red", "orange", "yellow", "yellow_green", 
-            "green", "emerald", "cyan", "azure",
-            "blue", "violet", "magenta", "crimson"
+            "red", "red_orange", "orange", "yellow_orange", 
+            "yellow", "yellow_green", "green", "green_blue",
+            "blue", "blue_violet", "violet", "red_violet"
         ]
+        
+        # Нейтральные цвета
+        self.neutral_colors = ["white", "light_gray", "gray", "dark_gray", "black"]
         
         # Цветовые схемы
         self.schemes = {
@@ -23,35 +26,14 @@ class IttenColorCircle:
             'analogous': 'Аналоговая (соседние цвета)',
             'square': 'Квадрат (4 цвета через 90°)',
             'split_complementary': 'Расщепленная комплементарная',
-            'rectangle': 'Прямоугольная (тетрада)'
+            'rectangle': 'Прямоугольная (тетрада)',
+            'monochromatic': 'Монохроматическая (оттенки одного цвета)'
         }
         
-        # Цветовые названия для круга (сокращенные)
-        self.color_names = {
-            "red": "Красный",
-            "orange": "Оранж",
-            "yellow": "Желтый",
-            "yellow_green": "Желт-зел",
-            "green": "Зеленый",
-            "emerald": "Изумруд",
-            "cyan": "Голубой",
-            "azure": "Лазурный",
-            "blue": "Синий",
-            "violet": "Фиолет",
-            "magenta": "Пурпур",
-            "crimson": "Малинов",
-            "red_orange": "Кр-оранж",
-            "orange_yellow": "Ор-желт",
-            "yellow_green2": "Желт-зел2",
-            "green_emerald": "Зел-изум",
-            "emerald_cyan": "Из-голуб",
-            "cyan_azure": "Гол-лазур",
-            "azure_blue": "Лаз-син",
-            "blue_violet": "Син-фиол",
-            "violet_magenta": "Фил-пурп",
-            "magenta_crimson": "Пурп-мал",
-            "crimson_red": "Мал-крас"
-        }
+        # Создаем словарь оттенков для каждого цвета
+        self.color_shades = {}
+        for color in self.main_colors:
+            self.color_shades[color] = [f"{color}_{i}" for i in range(1, 6)]
     
     def get_color_info(self, color_name):
         """Получить информацию о цвете"""
@@ -62,7 +44,32 @@ class IttenColorCircle:
                 'hex': self.colors[color_name],
                 'rgb': self.hex_to_rgb(self.colors[color_name])
             }
+        
+        # Проверяем, может это оттенок основного цвета
+        if '_' in color_name:
+            base_color = '_'.join(color_name.split('_')[:-1])
+            shade_num = color_name.split('_')[-1]
+            if base_color in self.main_colors and shade_num.isdigit():
+                actual_name = f"{base_color}_{shade_num}"
+                if actual_name in self.colors:
+                    return {
+                        'name': actual_name,
+                        'hex': self.colors[actual_name],
+                        'rgb': self.hex_to_rgb(self.colors[actual_name])
+                    }
+        
         return None
+    
+    def get_all_shades(self, base_color):
+        """Получить все 5 оттенков для основного цвета"""
+        if base_color in self.color_shades:
+            shades = []
+            for shade_name in self.color_shades[base_color]:
+                info = self.get_color_info(shade_name)
+                if info:
+                    shades.append(info)
+            return shades
+        return []
     
     def hex_to_rgb(self, hex_color):
         """Конвертация HEX в RGB"""
@@ -75,8 +82,14 @@ class IttenColorCircle:
     
     def find_position(self, color_name):
         """Найти позицию цвета в круге"""
-        if color_name in self.main_colors:
-            return self.main_colors.index(color_name) * 30
+        # Если это оттенок, берем основной цвет
+        if '_' in color_name and color_name.split('_')[-1].isdigit():
+            base_color = '_'.join(color_name.split('_')[:-1])
+        else:
+            base_color = color_name
+        
+        if base_color in self.main_colors:
+            return self.main_colors.index(base_color) * 30
         return None
     
     def get_scheme(self, base_color, scheme_type):
@@ -85,57 +98,81 @@ class IttenColorCircle:
         if not base_info:
             return None
         
-        position = self.find_position(base_color)
+        # Определяем основной цвет для расчета схемы
+        if '_' in base_color and base_color.split('_')[-1].isdigit():
+            main_color = '_'.join(base_color.split('_')[:-1])
+        else:
+            main_color = base_color
+        
+        position = self.find_position(main_color)
         if position is None:
             position = 0
         
         schemes = []
         
         if scheme_type == 'complementary':
+            # Противоположный цвет (180°)
             opposite_pos = (position + 180) % 360
-            schemes = [base_color, self.get_color_at_angle(opposite_pos)]
+            schemes = [main_color, self.get_color_at_angle(opposite_pos)]
             
         elif scheme_type == 'triad':
+            # Триада (3 цвета через 120°)
             schemes = [
-                base_color,
+                main_color,
                 self.get_color_at_angle((position + 120) % 360),
                 self.get_color_at_angle((position + 240) % 360)
             ]
             
         elif scheme_type == 'analogous':
+            # Аналоговая схема (соседние цвета ±30°)
             schemes = [
                 self.get_color_at_angle((position - 30) % 360),
-                base_color,
+                main_color,
                 self.get_color_at_angle((position + 30) % 360)
             ]
             
         elif scheme_type == 'square':
+            # Квадрат (4 цвета через 90°)
             schemes = [
-                base_color,
+                main_color,
                 self.get_color_at_angle((position + 90) % 360),
                 self.get_color_at_angle((position + 180) % 360),
                 self.get_color_at_angle((position + 270) % 360)
             ]
             
         elif scheme_type == 'split_complementary':
+            # Расщепленная комплементарная
             schemes = [
-                base_color,
+                main_color,
                 self.get_color_at_angle((position + 150) % 360),
                 self.get_color_at_angle((position + 210) % 360)
             ]
             
         elif scheme_type == 'rectangle':
+            # Прямоугольная схема (4 цвета)
             schemes = [
-                base_color,
+                main_color,
                 self.get_color_at_angle((position + 60) % 360),
                 self.get_color_at_angle((position + 180) % 360),
                 self.get_color_at_angle((position + 240) % 360)
             ]
+            
+        elif scheme_type == 'monochromatic':
+            # Монохроматическая схема - возвращаем оттенки выбранного цвета
+            if main_color in self.color_shades:
+                return self.get_all_shades(main_color)
+            else:
+                return [base_info]
         
+        # Получаем информацию о цветах схемы
         result = []
         for color in schemes:
             if isinstance(color, str):
-                info = self.get_color_info(color)
+                # Используем средний тон (shade=3) для схем
+                if color in self.main_colors:
+                    info = self.get_color_info(color)
+                else:
+                    info = self.get_color_info(f"{color}_3")
                 if info:
                     result.append(info)
         
@@ -147,7 +184,7 @@ class IttenColorCircle:
         return self.main_colors[index]
     
     def create_color_palette_image(self, colors, scheme_name):
-        """Создать изображение палитры (только цвета, без текста)"""
+        """Создать изображение палитры"""
         try:
             width = 500
             height = 200
@@ -175,11 +212,11 @@ class IttenColorCircle:
             print(f"Ошибка создания палитры: {e}")
             return None
     
-    def create_color_preview(self, color_name):
-        """Создать превью одного цвета (только цвет, без текста)"""
+    def create_shades_palette(self, base_color):
+        """Создать палитру оттенков для одного цвета"""
         try:
-            color_info = self.get_color_info(color_name)
-            if not color_info:
+            shades = self.get_all_shades(base_color)
+            if not shades:
                 return None
             
             width = 400
@@ -188,8 +225,13 @@ class IttenColorCircle:
             img = Image.new('RGB', (width, height), 'white')
             draw = ImageDraw.Draw(img)
             
-            # Основной цвет
-            draw.rectangle([0, 0, width, height], fill=color_info['rgb'])
+            color_width = width // len(shades)
+            
+            # Рисуем оттенки
+            for i, shade_info in enumerate(shades):
+                x0 = i * color_width
+                x1 = (i + 1) * color_width
+                draw.rectangle([x0, 0, x1, height], fill=shade_info['rgb'])
             
             # Рамка
             draw.rectangle([0, 0, width-1, height-1], outline='black', width=3)
@@ -200,11 +242,11 @@ class IttenColorCircle:
             
             return img_byte_arr
         except Exception as e:
-            print(f"Ошибка создания превью цвета: {e}")
+            print(f"Ошибка создания палитры оттенков: {e}")
             return None
     
     def create_itten_circle_image(self):
-        """Создать изображение цветового круга Иттена (упрощенный вариант)"""
+        """Создать изображение цветового круга Иттена"""
         try:
             size = 600
             center = size // 2
@@ -237,22 +279,6 @@ class IttenColorCircle:
                 fill='white', outline='black'
             )
             
-            # Текст в центре
-            try:
-                # Пытаемся использовать шрифт по умолчанию
-                from PIL import ImageFont
-                font = ImageFont.load_default()
-                text = "ITTEN"
-                bbox = draw.textbbox((0, 0), text, font=font)
-                text_width = bbox[2] - bbox[0]
-                text_height = bbox[3] - bbox[1]
-                draw.text(
-                    (center - text_width//2, center - text_height//2),
-                    text, fill='black', font=font
-                )
-            except:
-                pass  # Пропускаем текст если шрифт не доступен
-            
             # Рамка
             draw.rectangle([0, 0, size-1, size-1], outline='black', width=3)
             
@@ -266,36 +292,33 @@ class IttenColorCircle:
             return None
     
     def create_extended_palette_image(self):
-        """Создать изображение полной палитры (упрощенный вариант)"""
+        """Создать изображение полной палитры (60 цветов)"""
         try:
-            width = 600
-            height = 400
+            width = 800
+            height = 600
             
             img = Image.new('RGB', (width, height), 'white')
             draw = ImageDraw.Draw(img)
             
-            # Отображаем все цвета в виде сетки
-            colors_list = list(self.colors.items())
-            cols = 6
-            rows = (len(colors_list) + cols - 1) // cols
+            # Создаем сетку 12x5 (12 цветов по 5 оттенков)
+            cols = 12
+            rows = 5
             
             color_width = width // cols
             color_height = height // rows
             
-            for idx, (color_name, color_hex) in enumerate(colors_list):
-                row = idx // cols
-                col = idx % cols
-                
-                x0 = col * color_width
-                y0 = row * color_height
-                x1 = x0 + color_width
-                y1 = y0 + color_height
-                
-                rgb = self.hex_to_rgb(color_hex)
-                draw.rectangle([x0, y0, x1, y1], fill=rgb)
-                
-                # Тонкая рамка для каждого цвета
-                draw.rectangle([x0, y0, x1, y1], outline='black', width=1)
+            for col_idx, main_color in enumerate(self.main_colors):
+                shades = self.get_all_shades(main_color)
+                for row_idx, shade_info in enumerate(shades):
+                    x0 = col_idx * color_width
+                    y0 = row_idx * color_height
+                    x1 = x0 + color_width
+                    y1 = y0 + color_height
+                    
+                    draw.rectangle([x0, y0, x1, y1], fill=shade_info['rgb'])
+                    
+                    # Тонкая рамка для каждого цвета
+                    draw.rectangle([x0, y0, x1, y1], outline='black', width=1)
             
             # Внешняя рамка
             draw.rectangle([0, 0, width-1, height-1], outline='black', width=3)
@@ -312,3 +335,15 @@ class IttenColorCircle:
     def get_all_colors_list(self):
         """Получить список всех доступных цветов"""
         return list(self.colors.keys())
+    
+    def get_main_colors_list(self):
+        """Получить список основных цветов"""
+        return self.main_colors
+    
+    def get_color_group(self, base_color):
+        """Получить все цвета из группы (основной цвет + его оттенки)"""
+        if base_color in self.main_colors:
+            return [base_color] + self.color_shades[base_color]
+        elif base_color in self.neutral_colors:
+            return [base_color]
+        return []
